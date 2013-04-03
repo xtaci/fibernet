@@ -126,20 +126,6 @@ namespace fibernet
 			return send(context, source, des, type, session, data, sz);
 		}
 
-		/**
-		 * send message directly to the target context.
-		 */
-		void send(Context * ctx, void * msg, size_t sz, uint32_t source, int type, int session) 
-		{
-			Messsage smsg;
-			smsg.source = source;
-			smsg.session = session;
-			smsg.data = msg;
-			smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
-			
-			ctx->queue->push(&smsg);
-		}
-
 	private:
 		/**
 		 * dispatch the message, callback function is called with msg.

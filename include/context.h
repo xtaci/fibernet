@@ -38,8 +38,8 @@ namespace fibernet
 		void * cb_ud;			// 
 		skynet_cb cb;
 		int session_id;
-		uint32_t forward;				// forward to another ctx
-		struct message_queue *queue;	// mq
+		uint32_t forward;		// forward to another ctx
+		MQ *queue;				// mq
 		bool init;
 		bool endless;
 
@@ -89,6 +89,20 @@ namespace fibernet
 		}
 
 	public:
+		/**
+		 * send message directly to the this context.
+		 */
+		void send(void * msg, size_t sz, uint32_t source, int type, int session) 
+		{
+			Messsage smsg;
+			smsg.source = source;
+			smsg.session = session;
+			smsg.data = msg;
+			smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
+			
+			queue->push(&smsg);
+		}
+
 		/**
 		 * push a message to a context by handle.
 		 */
