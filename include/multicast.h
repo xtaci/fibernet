@@ -28,7 +28,7 @@ namespace fibernet
 		 * create a piece of multicast message.
 		 * the msg is malloc-ed by caller, released by this.
 		 */
-		MulticastMessage(const void * msg, size_t sz, uint32_t source):m_msg(msg),m_ref(0),m_sz(sz), m_source(source) {}
+		MulticastMessage(const void * msg, size_t sz, uint32_t source):m_ref(0),m_msg(msg),m_sz(sz), m_source(source) {}
 
 		~MulticastMessage() { free((void*)m_msg); }
 

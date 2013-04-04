@@ -128,7 +128,6 @@ namespace fibernet
 	private:
 		std::string operator[] (uint32_t handle)
 		{
-			Context * ctx;
 			std::string name;
 
 			lock.rlock();

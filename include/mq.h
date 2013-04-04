@@ -31,15 +31,15 @@ namespace fibernet
 	 */
 	class GlobalMQ {
 	private:
-		uint32_t head;
-		uint32_t tail;
+		uint32_t m_head;
+		uint32_t m_tail;
 		MQ ** queue;
 		bool * flag;
 
 		static GlobalMQ * _instance;
 
 	private:
-		GlobalMQ():head(0), tail(0)
+		GlobalMQ():m_head(0), m_tail(0)
 		{
 			queue = new MQ*[MAX_GLOBAL_MQ];
 			flag = new bool[MAX_GLOBAL_MQ];
@@ -69,10 +69,10 @@ namespace fibernet
 
 		MQ * pop(void)
 		{
-			uint32_t head = head;
+			uint32_t head = m_head;
 			uint32_t head_ptr = GP(head);
 
-			if (head_ptr == GP(tail)) {	//empty queue
+			if (head_ptr == GP(m_tail)) {	//empty queue
 				return NULL;
 			}
 
@@ -81,7 +81,7 @@ namespace fibernet
 			}
 
 			MQ * mq = queue[head_ptr];
-			if (!__sync_bool_compare_and_swap(&head, head, head+1)) {
+			if (!__sync_bool_compare_and_swap(&m_head, head, head+1)) {
 				return NULL;
 			}
 
@@ -93,7 +93,7 @@ namespace fibernet
 
 		void push(MQ * mq)
 		{
-			uint32_t tail = GP(__sync_fetch_and_add(&tail,1));
+			uint32_t tail = GP(__sync_fetch_and_add(&m_tail,1));
 			queue[tail] = mq;
 			__sync_synchronize();
 			flag[tail] = true;
@@ -122,9 +122,9 @@ namespace fibernet
 	private:
 
 		uint32_t m_handle;
-		int cap;
-		int head;
-		int tail;
+		int m_cap;
+		int m_head;
+		int m_tail;
 		int m_lock;
 		int m_release;
 		int lock_session;
@@ -134,15 +134,15 @@ namespace fibernet
 	public:
 
 		MQ(uint32_t handle) : m_handle(handle),
-			cap(DEFAULT_QUEUE_SIZE),
-			head(0),
-			tail(0),
+			m_cap(DEFAULT_QUEUE_SIZE),
+			m_head(0),
+			m_tail(0),
 			m_lock(0),
-			in_global(MQ_IN_GLOBAL),
 			m_release(0),
-			lock_session(0)
+			lock_session(0),
+			in_global(MQ_IN_GLOBAL)
 		{
-			queue = new Message[cap];
+			queue = new Message[m_cap];
 		}
 
 	
@@ -173,11 +173,11 @@ namespace fibernet
 			bool ret = false;
 			LOCK();
 
-			if (head != tail) {
-				*message = queue[head];
+			if (m_head != m_tail) {
+				*message = queue[m_head];
 				ret = true;
-				if ( ++head >= cap) {
-					head = 0;
+				if ( ++m_head >= m_cap) {
+					m_head = 0;
 				}
 			}
 
@@ -204,12 +204,12 @@ namespace fibernet
 				pushhead(message);
 			} else {
 				// queue the msg
-				queue[tail] = *message;
-				if (++tail >= cap) {
-					tail = 0;
+				queue[m_tail] = *message;
+				if (++m_tail >= m_cap) {
+					m_tail = 0;
 				}
 
-				if (head == tail) {
+				if (m_head == m_tail) {
 					expand();
 				}
 
@@ -279,14 +279,14 @@ namespace fibernet
 		 */
 		void expand() 
 		{
-			Message * new_queue = new Message[cap*2];
+			Message * new_queue = new Message[m_cap*2];
 			int i;
-			for (i=0;i<cap;i++) {
-				new_queue[i] = queue[(head + i) % cap];
+			for (i=0;i<m_cap;i++) {
+				new_queue[i] = queue[(m_head + i) % m_cap];
 			}
-			head = 0;
-			tail = cap;
-			cap *= 2;
+			m_head = 0;
+			m_tail = m_cap;
+			m_cap *= 2;
 			
 			delete [] queue;	
 			queue = new_queue;
@@ -296,18 +296,18 @@ namespace fibernet
 	     * push the msg to the head of the queue.
 		 */
 		void pushhead(const Message *message) {
-			int head = head - 1;
+			int head = m_head - 1;
 			if (head < 0) {
-				head = cap - 1;
+				head = m_cap - 1;
 			}
-			if (head == tail) {
+			if (head == m_tail) {
 				expand();
-				--tail;
-				head = cap - 1;
+				--m_tail;
+				head = m_cap - 1;
 			}
 
 			queue[head] = *message;
-			head = head;
+			m_head = head;
 
 			// this api use in push a unlock message, so the in_global flags must not be 0 , 
 			// but the q is not exist in global queue.

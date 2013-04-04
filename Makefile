@@ -1,6 +1,6 @@
 .PHONY : all clean 
 
-CFLAGS = -g -Wall -Wunused-function -I./include -I/usr/include/lua5.2
+CFLAGS = -g -Wall -Wno-unused-function -I./include -I/usr/include/lua5.2
 LDFLAGS = -lpthread -llua -ldl -lm
 
 uname_S := $(shell sh -c 'uname -s 2>/dev/null || echo not')
