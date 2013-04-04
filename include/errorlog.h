@@ -10,7 +10,7 @@
 namespace fibernet
 {
 	class Context;
-	static void errorlog(Context * context, const char *msg, ...);
+	void errorlog(Context * context, const char *msg, ...);
 }
 
 #endif //

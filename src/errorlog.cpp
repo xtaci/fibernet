@@ -5,7 +5,7 @@
 
 namespace fibernet
 {
-	static void errorlog(Context * context, const char *msg, ...) 
+	void errorlog(Context * context, const char *msg, ...) 
 	{
 		static int logger = -1;
 		if (logger < 0) {

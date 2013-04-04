@@ -1,3 +1,7 @@
+#include "timer.h"
+#include "mq.h"
+#include "context.h"
+
 namespace fibernet
 {
 	Timer * Timer::m_instance = NULL;
@@ -11,7 +15,7 @@ namespace fibernet
 			message.data = NULL;
 			message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
 
-			if (Contex::push(handle, &message)) {
+			if (Context::push(handle, &message)) {
 				return -1;
 			}
 		} else {
@@ -42,10 +46,10 @@ namespace fibernet
 			message.data = NULL;
 			message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
 
-			Context::push(t->event.handle, &message);
+			Context::push(node->event.handle, &message);
 
 			list_del(&node->node);
-			delete t;
+			delete node;
 		}
 
 		++m_time;		// 10ms has passed

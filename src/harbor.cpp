@@ -20,7 +20,7 @@ namespace fibernet
 		return true;
 	}
 	
-	void Harbor::send(struct remote_message *rmsg, uint32_t source, int session); 
+	void Harbor::send(struct remote_message *rmsg, uint32_t source, int session)
 	{
 		int type = rmsg->sz >> HANDLE_REMOTE_SHIFT;
 		rmsg->sz &= HANDLE_MASK;

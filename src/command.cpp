@@ -1,5 +1,8 @@
 #include "command.h"
 #include "context.h"
+#include "mq.h"
+#include "handle.h"
+#include "harbor.h"
 #include "env.h"
 #include "timer.h"
 #include "group_mgr.h"

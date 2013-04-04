@@ -1,4 +1,5 @@
 #include "mq.h"
+#include "multicast.h"
 
 namespace fibernet 
 {

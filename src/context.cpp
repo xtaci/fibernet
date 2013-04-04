@@ -1,5 +1,7 @@
 #include "context.h"
 #include "handle.h"
+#include "mq.h"
+#include "module.h"
 
 namespace fibernet
 {
@@ -11,7 +13,7 @@ namespace fibernet
 	 */
 	void Context::send(void * msg, size_t sz, uint32_t source, int type, int session) 
 	{
-		MQ::Message smsg;
+		Message smsg;
 		smsg.source = source;
 		smsg.session = session;
 		smsg.data = msg;
@@ -23,7 +25,7 @@ namespace fibernet
 	/**
 	 * push a closed-message to a context by handle.
 	 */
-	int Context::push(uint32_t handle, MQ::Message *message) 
+	int Context::push(uint32_t handle, Message *message) 
 	{
 		Context * ctx = Handle::instance()->grab(handle);
 		if (ctx == NULL) {

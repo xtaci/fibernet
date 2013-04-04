@@ -1,4 +1,7 @@
-#include "mutlicast.h"
+#include "multicast.h"
+#include "context.h"
+#include "handle.h"
+#include "errorlog.h"
 
 namespace fibernet 
 {
@@ -6,7 +9,7 @@ namespace fibernet
 	{
 		combine_queue(from);
 		int release = 0;
-		if (group->number > 0) {
+		if (number > 0) {
 			uint32_t source = from->handle();
 			msg->copy(number);
 			int i;
@@ -23,7 +26,7 @@ namespace fibernet
 			}
 		}
 		
-		msg->copy(msg, -release);
+		msg->copy(-release);
 		
 		return number - release;
 	}
@@ -97,7 +100,7 @@ namespace fibernet
 				++old_index;
 				--i;
 			} else {
-				skynet_error(from, "Try to remove a none exist handle : %x", handle);
+				errorlog(from, "Try to remove a none exist handle : %x", handle);
 			}
 		}
 		while (new_index < count) {
