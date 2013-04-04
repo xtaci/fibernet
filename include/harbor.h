@@ -4,12 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define GLOBALNAME_LENGTH 16
-#define REMOTE_MAX 256
-
-// reserve high 8 bits for remote id
-#define HANDLE_MASK 0xffffff
-#define HANDLE_REMOTE_SHIFT 24
+#include "fibernet.h"
 
 namespace fibernet
 {

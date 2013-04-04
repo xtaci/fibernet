@@ -320,24 +320,7 @@ namespace fibernet
 		/**
 		 * queue drop 
 		 */
-		int drop_queue() {
-			// todo: send message back to message source
-			struct Message msg;
-			int s = 0;
-			while(!pop(&msg)) {
-				++s;
-				int type = msg.sz >> HANDLE_REMOTE_SHIFT;
-				if (type == PTYPE_MULTICAST) {
-					assert((msg.sz & HANDLE_MASK) == 0);
-					skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
-				} else {
-					// make sure data is freed
-					free(msg.data);
-				}
-			}
-			delete this;
-			return s;
-		}
+		int drop_queue();
 	};
 }
 

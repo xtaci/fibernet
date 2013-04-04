@@ -15,4 +15,11 @@
 
 typedef int (*fibernet_cb)(struct skynet_context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz);
 
+#define GLOBALNAME_LENGTH 16
+#define REMOTE_MAX 256
+
+// reserve high 8 bits for remote id
+#define HANDLE_MASK 0xffffff
+#define HANDLE_REMOTE_SHIFT 24
+
 #endif
