@@ -5,8 +5,11 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
-#include "double_linked_list.h"
+#include "lib/double_linked_list.h"
+
+#include "fibernet.h"
 
 #if defined(__APPLE__)
 #include <sys/time.h>
@@ -79,31 +82,7 @@ namespace fibernet
 			}
 		}
 
-		int timeout(uint32_t handle, int time, int session) 
-		{
-			if (time == 0) {
-				struct skynet_message message;
-				message.source = 0;
-				message.session = session;
-				message.data = NULL;
-				message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
-
-				if (Contex::push(handle, &message)) {
-					return -1;
-				}
-			} else {
-				timer_node * node = new timer_node;
-				node->event.handle = handle;
-				node->event.session = session;
-				
-				while (__sync_lock_test_and_set(&m_lock,1)) {};
-					node->expire = time + m_time;
-					add_node(node);
-				__sync_lock_release(&m_lock);
-			}
-
-			return session;
-		}
+		int timeout(uint32_t handle, int time, int session);
 
 	private:
 		Timer()
@@ -115,7 +94,7 @@ namespace fibernet
 			
 			for (i=0;i<4;i++) {
 				for (j=0;j<TIME_LEVEL-1;j++) {
-					INIT_LIST_HEAD(&t[i]);
+					INIT_LIST_HEAD(&t[i][j]);
 				}
 			}
 
@@ -187,50 +166,7 @@ namespace fibernet
 		/**
 		 * execute callback
 		 */
-		void execute()
-		{
-			while (__sync_lock_test_and_set(&m_lock,1)) {};
-
-			// process near events
-			int idx = m_time & TIME_NEAR_MASK;
-			struct timer_node * node, * safe;
-			list_for_each_entry_safe(node, safe, &near[idx], node) {
-				struct skynet_message message;
-				message.source = 0;
-				message.session = node->event.session;
-				message.data = NULL;
-				message.sz = PTYPE_RESPONSE << HANDLE_REMOTE_SHIFT;
-
-				Context::push(t->event.handle, &message);
-
-				list_del(&node->node);
-				delete t;
-			}
-
-			++m_time;		// 10ms has passed
-		
-			// schedule further events
-			int msb = TIME_NEAR;					// most significant bit
-			int time = m_time >> TIME_NEAR_SHIFT;	// 24bit part 
-			int i=0;
-		
-			// for each 6-bit part
-			while ((m_time & (msb-1))==0) {
-				idx=time & TIME_LEVEL_MASK;
-				if (idx!=0) { // ignore 0
-					--idx;
-					list_for_each_entry_safe(node,safe,&t[i][idx], node) {
-						list_del(&node->node);
-						add_node(node);
-					}
-					break;				
-				}
-				msb <<= TIME_LEVEL_SHIFT;
-				time >>= TIME_LEVEL_SHIFT;
-				++i;
-			}
-			__sync_lock_release(&m_lock);
-		}
+		void execute();
 	};
 }
 

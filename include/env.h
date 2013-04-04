@@ -27,8 +27,6 @@ namespace fibernet
 		{
 			lock();
 
-			lua_State *L = E->L;
-			
 			lua_getglobal(L, key);
 			const char * result = lua_tostring(L, -1);
 			lua_pop(L, 1);
@@ -42,7 +40,6 @@ namespace fibernet
 		{
 			lock();
 			
-			lua_State *L = E->L;
 			lua_getglobal(L, key);
 			assert(lua_isnil(L, -1));
 			lua_pop(L,1);
