@@ -25,9 +25,18 @@ namespace fibernet
 	private:
 		Context * REMOTE;
 		uint32_t HARBOR;
+		Harbor(int harbor): HARBOR(harbor<<HANDLE_REMOTE_SHIFT) {}
+
+		static Harbor * m_instance;
 
 	public:
-		Harbor(int harbor): HARBOR(harbor<<HANDLE_REMOTE_SHIFT) {}
+
+		static void create_instance(int harbor)
+		{
+			if (!m_instance) m_instance = new Harbor(harbor);
+		}
+
+		static Harbor * instance() { return m_instance;}
 
 		/**
 		 * start harbor. 

@@ -1,8 +1,13 @@
 #include "command.h"
+#include "context.h"
+#include "env.h"
+#include "timer.h"
+#include "group_mgr.h"
+#include "errorlog.h"
 
 namespace fibernet
 {
-	const char * Command:exec(Context * ctx, const char * cmd,const char * param) 
+	const char * Command::exec(Context * ctx, const char * cmd,const char * param) 
 	{
 		/**
 		 * Syntax: TIMEOUT N*10ms
@@ -16,9 +21,9 @@ namespace fibernet
 			int session = ctx->newsession();
 			if (session < 0) 
 				return NULL;
-			skynet_timeout(ctx->handle(), ti, session);
-			sprintf(ctx->result, "%d", session);
-			return ctx->result;
+			Timer::instance()->timeout(ctx->m_handle, ti, session);
+			sprintf(ctx->m_result, "%d", session);
+			return ctx->m_result;
 		}
 
 		/**
@@ -27,10 +32,10 @@ namespace fibernet
 		 * after the session sent a message.
 		 */
 		if (strcmp(cmd,"LOCK") == 0) {
-			if (ctx->init == false) {
+			if (ctx->m_init == false) {
 				return NULL;
 			}
-			ctx->queue->lock(ctx->session_id+1);
+			ctx->queue->lock(ctx->m_sess_id+1);
 			return NULL;
 		}
 
@@ -42,16 +47,19 @@ namespace fibernet
 		 */
 		if (strcmp(cmd,"REG") == 0) {
 			if (param == NULL || param[0] == '\0') {
-				sprintf(ctx->result, ":%x", ctx->handle);
-				return ctx->result;
+				sprintf(ctx->m_result, ":%x", ctx->m_handle);
+				return ctx->m_result;
 			} else if (param[0] == '.') {
-				return Handle::instance()->reg_name(ctx->handle, param + 1);
+				if (Handle::instance()->reg_name(ctx->m_handle, param + 1)) {
+					return strdup(param +1);
+				} 
+				return NULL;
 			} else {
-				assert(ctx->handle!=0);
-				struct remote_name *rname = malloc(sizeof(*rname));
+				assert(ctx->m_handle!=0);
+				struct remote_name *rname = (struct remote_name*)malloc(sizeof(*rname));
 				_copy_name(rname->name, param);
-				rname->handle = ctx->handle;
-				skynet_harbor_register(rname);
+				rname->handle = ctx->m_handle;
+				Harbor::instance()->reg(rname);
 				return NULL;
 			}
 		}
@@ -73,12 +81,15 @@ namespace fibernet
 				return NULL;
 			}
 			if (name[0] == '.') {
-				return skynet_handle_namehandle(handle_id, name + 1);
+				if (Handle::instance()->reg_name(ctx->m_handle, param + 1)) {
+					return strdup(param +1);
+				} 
+				return NULL;
 			} else {
-				struct remote_name *rname = malloc(sizeof(*rname));
+				struct remote_name *rname = (struct remote_name*)malloc(sizeof(*rname));
 				_copy_name(rname->name, name);
 				rname->handle = handle_id;
-				skynet_harbor_register(rname);
+				Harbor::instance()->reg(rname);
 			}
 			return NULL;
 		}
@@ -88,9 +99,9 @@ namespace fibernet
 		 * get current time, in 10ms
 		 */
 		if (strcmp(cmd,"NOW") == 0) {
-			uint32_t ti = skynet_gettime();
-			sprintf(ctx->result,"%u",ti);
-			return ctx->result;
+			uint32_t ti = Timer::instance()->gettime();
+			sprintf(ctx->m_result,"%u",ti);
+			return ctx->m_result;
 		}
 
 		/**
@@ -98,7 +109,7 @@ namespace fibernet
 		 * destroy context
 		 */
 		if (strcmp(cmd,"EXIT") == 0) {
-			Handle::instance()->retire(ctx->handle);
+			Handle::instance()->retire(ctx->m_handle);
 			return NULL;
 		}
 
@@ -110,9 +121,9 @@ namespace fibernet
 			if (param[0] == ':') {
 				handle = strtoul(param+1, NULL, 16);
 			} else if (param[0] == '.') {
-				handle = skynet_handle_findname(param+1);
+				handle = Handle::instance()->get_handle(param+1);
 			} else {
-				skynet_error(context, "Can't kill %s",param);
+				errorlog(ctx, "Can't kill %s",param);
 				// todo : kill global service
 			}
 			if (handle) {
@@ -133,12 +144,12 @@ namespace fibernet
 			char * mod = strsep(&args, " \t\r\n");
 			args = strsep(&args, "\r\n");
 			Context * new_ctx = ContextFactory::create(mod,args);
-			if (inst == NULL) {
+			if (new_ctx == NULL) {
 				fprintf(stderr, "Launch %s %s failed\n",mod,args);
 				return NULL;
 			} else {
-				_id_to_hex(ctx->result, new_ctx->handle);
-				return ctx->result;
+				_id_to_hex(ctx->m_result, new_ctx->m_handle);
+				return ctx->m_result;
 			}
 		}
 
@@ -147,7 +158,7 @@ namespace fibernet
 		 * Application level environment variable
 		 */
 		if (strcmp(cmd,"GETENV") == 0) {
-			return skynet_getenv(param);
+			return Env::instance()->get(param);
 		}
 
 		/**
@@ -166,7 +177,7 @@ namespace fibernet
 			key[i] = '\0';
 			param += i+1;
 			
-			skynet_setenv(key,param);
+			Env::instance()->set(key,param);
 			return NULL;
 		}
 
@@ -175,9 +186,9 @@ namespace fibernet
 		 * starttime in secs, since epoch
 		 */
 		if (strcmp(cmd,"STARTTIME") == 0) {
-			uint32_t sec = skynet_gettime_fixsec();
-			sprintf(ctx->result,"%u",sec);
-			return ctx->result;
+			uint32_t sec = Timer::instance()->gettime_fixsec();
+			sprintf(ctx->m_result,"%u",sec);
+			return ctx->m_result;
 		}
 
 		/**
@@ -192,7 +203,7 @@ namespace fibernet
 			int group_handle=0;
 			uint32_t addr=0;
 			sscanf(tmp, "%s %d :%x",cmd,&group_handle,&addr);
-			return _group_command(context, cmd, group_handle,addr);
+			return _group_command(ctx, cmd, group_handle,addr);
 		}
 
 		/**
@@ -200,10 +211,10 @@ namespace fibernet
 		 * set endless
 		 */
 		if (strcmp(cmd,"ENDLESS") == 0) {
-			if (ctx->endless) {
-				strcpy(ctx->result, "1");
-				ctx->endless = false;
-				return ctx->result;
+			if (ctx->m_endless) {
+				strcpy(ctx->m_result, "1");
+				ctx->m_endless = false;
+				return ctx->m_result;
 			}
 			return NULL;
 		}
@@ -220,17 +231,17 @@ namespace fibernet
 		return NULL;
 	}
 
-	static const char * Command::_group_command(Context * ctx, const char * cmd, int group_handle, uint32_t addr) 
+	const char * Command::_group_command(Context * ctx, const char * cmd, int group_handle, uint32_t addr) 
 	{
 		uint32_t self;
 		if (addr != 0) {
-			if (skynet_harbor_message_isremote(v)) {
-				skynet_error(ctx, "Can't add remote handle %x",v);
+			if (Harbor::instance()->isremote(addr)) {
+				errorlog(ctx, "Can't add remote handle %x",addr);
 				return NULL;
 			}
 			self = addr;
 		} else {
-			self = ctx->handle;
+			self = ctx->m_handle;
 		}
 
 		/**
@@ -257,8 +268,8 @@ namespace fibernet
 			if (addr == 0) {
 				return NULL;
 			}
-			_id_to_hex(ctx->result, addr);
-			return ctx->result;
+			_id_to_hex(ctx->m_result, addr);
+			return ctx->m_result;
 		}
 
 		/**
