@@ -51,7 +51,7 @@ namespace fibernet
 				return ctx->m_result;
 			} else if (param[0] == '.') {
 				if (Handle::instance()->reg_name(ctx->m_handle, param + 1)) {
-					return strdup(param +1);
+					return param +1;
 				} 
 				return NULL;
 			} else {
@@ -82,7 +82,7 @@ namespace fibernet
 			}
 			if (name[0] == '.') {
 				if (Handle::instance()->reg_name(ctx->m_handle, param + 1)) {
-					return strdup(param +1);
+					return param+1;
 				} 
 				return NULL;
 			} else {

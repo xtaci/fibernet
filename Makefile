@@ -11,7 +11,10 @@ else
 	SHARED = -fPIC --shared
 endif
 
-SRCS = $(wildcard src/*.cpp)
+CPP_FILES = $(wildcard src/*.cpp)
+OBJ_FILES = $(addprefix obj/,$(notdir $(CPP_FILES:.cpp=.o)))
 
-all: $(SRCS)
+obj/%.o: src/%.cpp
 	g++ -c $(CFLAGS) $< -o $@
+
+all: $(OBJ_FILES)

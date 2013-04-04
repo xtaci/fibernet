@@ -88,9 +88,9 @@ namespace fibernet
 			m_forward = destination;
 		}
 	
-		static int context_total() { return g_total_context; }
-		static void context_inc() { __sync_fetch_and_add(&g_total_context,1); }
-		static void context_dec() { __sync_fetch_and_sub(&g_total_context,1); }
+		static int TOTAL() { return g_total_context; }
+		static void CONTEXT_INC() { __sync_fetch_and_add(&g_total_context,1); }
+		static void CONTEXT_DEC() { __sync_fetch_and_sub(&g_total_context,1); }
 
 	private:
 		Context();

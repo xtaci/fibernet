@@ -4,7 +4,7 @@
 namespace fibernet
 {
 
-	static int Context::g_total_context = 0;
+	int Context::g_total_context = 0;
 
 	/**
 	 * send message directly to the this context.
@@ -23,7 +23,7 @@ namespace fibernet
 	/**
 	 * push a closed-message to a context by handle.
 	 */
-	static int Context::push(uint32_t handle, MQ::Message *message) 
+	int Context::push(uint32_t handle, MQ::Message *message) 
 	{
 		Context * ctx = Handle::instance()->grab(handle);
 		if (ctx == NULL) {
@@ -38,7 +38,7 @@ namespace fibernet
 	/**
 	 * set the endless flag for a context by handle.
 	 */
-	static void Context::endless(uint32_t handle) 
+	void Context::endless(uint32_t handle) 
 	{
 		Context * ctx = Handle::instance()->grab(handle);
 		if (ctx == NULL) {
@@ -59,17 +59,17 @@ namespace fibernet
 
 	void Context::_delete_context()
 	{
-		mod->call_release(this);
+		m_mod->call_release(this);
 		queue->mark_release();	
 	
-		delete context;	
-		context_dec();
+		delete this;	
+		CONTEXT_DEC();
 	}
 
 	/// context factory
-	static Context * ContextFactory::create(const char * name, const char *param) 
+	Context * ContextFactory::create(const char * name, const char *param) 
 	{
-		Module * mod = GlobalModule::instance()->query(name);
+		Module * mod = GlobalModules::instance()->query(name);
 
 		if (mod == NULL)
 			return NULL;
@@ -94,9 +94,9 @@ namespace fibernet
 		ctx->m_endless = false;
 		ctx->m_handle = Handle::instance()->reg(ctx);
 
-		MQ * queue = ctx->queue = new MQ(ctx->handle);
+		MQ * queue = ctx->queue = new MQ(ctx->m_handle);
 		// init function maybe use ctx->handle, so it must init at last
-		_context_inc();
+		Context::CONTEXT_INC();
 
 		CHECKCALLING_BEGIN(ctx)
 		int r = mod->call_init(inst, ctx, param);
@@ -104,16 +104,16 @@ namespace fibernet
 		if (r == 0) {
 			Context * ret = ctx->release();
 			if (ret) {
-				ctx->init = true;
+				ctx->m_init = true;
 			}
 			GlobalMQ::instance()->push(queue);
 			if (ret) {
-				printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
+				printf("[:%x] launch %s %s\n", ret->m_handle, name, param ? param : "");
 			}
 			return ret;
 		} else {
 			ctx->release();
-			Handle::instance()->retire(ctx->handle);
+			Handle::instance()->retire(ctx->m_handle);
 			return NULL;
 		}
 	}
