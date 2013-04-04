@@ -1,5 +1,7 @@
 namespace fibernet
 {
+	Timer * Timer::m_instance = NULL;
+
 	int Timer::timeout(uint32_t handle, int time, int session) 
 	{
 		if (time == 0) {

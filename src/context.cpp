@@ -3,6 +3,9 @@
 
 namespace fibernet
 {
+
+	static int Context::g_total_context = 0;
+
 	/**
 	 * send message directly to the this context.
 	 */

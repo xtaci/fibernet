@@ -2,6 +2,8 @@
 
 namespace fibernet
 {
+	Handle * Handle::m_instance = NULL;
+
 	uint32_t Handle::reg(Context *ctx)
 	{
 		uint32_t handle;	

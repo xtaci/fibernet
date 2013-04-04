@@ -32,10 +32,10 @@ namespace fibernet
 	{
 	private:
 		Module * m_mod;			// the module
-		void * m_instance;		// result of xxx_create
+		void * m_instance;		// created by xxx_create, released by xxx_release
 
 		uint32_t m_handle;		// handle
-		int m_sess_id;
+		int m_sess_id;			// session id
 
 		char m_result[32];		// storing non-integer result
 		void * m_ud;			// user data

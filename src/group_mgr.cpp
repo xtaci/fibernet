@@ -1,5 +1,7 @@
 namespace fibernet
 {
+	GroupManager * GroupManager::m_instance = NULL;
+
 	uint32_t GroupManager::query(int group_handle);
 	{
 		lock();

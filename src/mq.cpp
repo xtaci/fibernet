@@ -2,6 +2,8 @@
 
 namespace fibernet 
 {
+	GlobalMQ * GlobalMQ::_instance = NULL;
+
 	int MQ::drop_queue() {
 		// todo: send message back to message source
 		struct Message msg;
