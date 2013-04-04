@@ -102,19 +102,22 @@ namespace fibernet
 	};
 
 	/**
+	 * Message definition
+	 */
+	struct Message 
+	{
+		uint32_t source;
+		int session;
+		void * data;
+		size_t sz;
+	};
+
+	/**
 	 * Message Queue
 	 */
 	class MQ 
 	{
 	public:
-
-		struct Message 
-		{
-			uint32_t source;
-			int session;
-			void * data;
-			size_t sz;
-		};
 
 	private:
 

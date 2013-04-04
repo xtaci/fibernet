@@ -1,8 +1,13 @@
+#include "group_mgr.h"
+#include "context.h"
+#include "dispatcher.h"
+#include "mq.h"
+
 namespace fibernet
 {
 	GroupManager * GroupManager::m_instance = NULL;
 
-	uint32_t GroupManager::query(int group_handle);
+	uint32_t GroupManager::query(int group_handle)
 	{
 		lock();
 
@@ -26,7 +31,7 @@ namespace fibernet
 			Context * ctx = m_hash[group_handle];
 			char * cmd = (char *)malloc(8);
 			int n = sprintf(cmd, "C");
-			Dispatcher::send(ctx, cmd, n+1, 0 , PTYPE_SYSTEM, 0);
+			ctx->send(cmd, n+1, 0 , PTYPE_SYSTEM, 0);
 			m_hash.delete_key(group_handle);
 		}
 
@@ -38,16 +43,16 @@ namespace fibernet
 		Context * ctx = ContextFactory::create("multicast", NULL);
 		assert(ctx);
 
-		m_hash.insert(handle, ctx);
+		m_hash[handle] = ctx;
 		return ctx;
 	}
 
 
 	void GroupManager::send_command(Context *ctx, const char * cmd, uint32_t node) 
 	{
-		char * tmp = malloc(16);
+		char * tmp = (char *)malloc(16);
 		int n = sprintf(tmp, "%s %x", cmd, node);
-		Dispatcher::send(ctx, tmp, n+1 , 0, PTYPE_SYSTEM, 0);
+		ctx->send(tmp, n+1 , 0, PTYPE_SYSTEM, 0);
 	}
 
 }

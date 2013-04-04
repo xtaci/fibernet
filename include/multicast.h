@@ -8,13 +8,12 @@
 namespace fibernet 
 {
 	extern "C" {
-			int compar_uint(const void *a, const void *b) {
-				const uint32_t * aa = (const uint32_t *)a;
-				const uint32_t * bb = (const uint32_t *)b;
-				return (int)(*aa - *bb);
-			}
+		int compar_uint(const void *a, const void *b) {
+			const uint32_t * aa = (const uint32_t *)a;
+			const uint32_t * bb = (const uint32_t *)b;
+			return (int)(*aa - *bb);
+		}
 	}
-
 
 	typedef void (*skynet_multicast_func)(void *ud, uint32_t source, const void * msg, size_t sz);
 	class MulticastMessage

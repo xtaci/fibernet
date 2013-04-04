@@ -1,4 +1,7 @@
 #include "errorlog.h"
+#include "handle.h"
+#include "mq.h"
+#include "context.h"
 
 namespace fibernet
 {
@@ -24,7 +27,7 @@ namespace fibernet
 			tmp[len] = '\0';
 		}
 
-		Messsage smsg;
+		Message smsg;
 		if (context == NULL) {
 			smsg.source = 0;
 		} else {
@@ -33,7 +36,7 @@ namespace fibernet
 		smsg.session = 0;
 		smsg.data = strdup(tmp);
 		smsg.sz = len | (PTYPE_TEXT << HANDLE_REMOTE_SHIFT);
-		logger->push(&smsg);
+		Context::push(logger, &smsg);
 	}
 
 }

@@ -1,14 +1,18 @@
 #include "dispatcher.h"
 #include "handle.h"
+#include "mq.h"
 #include "context.h"
+#include "monitor.h"
+#include "multicast.h"
+#include "errorlog.h"
 
 namespace fibernet
 {
 	//------------------------------------------------------------------------
-	static int Dispatcher::dispatch(Monitor *sm) 
+	int Dispatcher::dispatch(Monitor *sm) 
 	{
 		// pop one MQ
-		MQ * q = GlobalMQ::pop();
+		MQ * q = GlobalMQ::instance()->pop();
 
 		if (q==NULL)
 			return 1;
@@ -19,7 +23,7 @@ namespace fibernet
 		if (ctx == NULL) {
 			int s = q->release();
 			if (s>0) {
-				skynet_error(NULL, "Drop message queue %x (%d messages)", handle, s);
+				errorlog(NULL, "Drop message queue %x (%d messages)", handle, s);
 			}
 			return 0;
 		}
@@ -31,12 +35,12 @@ namespace fibernet
 			return 0;
 		}
 
-		skynet_monitor_trigger(sm, msg.source , handle);
+		sm->trigger(msg.source, handle);
 
 		// when callback function is not defined.
-		if (ctx->cb == NULL) {
+		if (ctx->m_cb == NULL) {
 			free(msg.data);
-			skynet_error(NULL, "Drop message from %x to %x without callback , size = %d",msg.source, handle, (int)msg.sz);
+			errorlog(NULL, "Drop message from %x to %x without callback , size = %d",msg.source, handle, (int)msg.sz);
 		} else {
 			_dispatch_message(ctx, &msg);
 		}
@@ -45,31 +49,31 @@ namespace fibernet
 		assert(q == ctx->queue);
 		q->pushglobal();
 		ctx->release();
-		skynet_monitor_trigger(sm, 0,0);
+		sm->trigger(0,0);
 
 		return 0;
 	}
 
 	//------------------------------------------------------------------------
-	static int Dispatcher::send(Context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) 
+	int Dispatcher::send(Context * context, uint32_t source, uint32_t destination , int type, int session, void * data, size_t sz) 
 	{
 		_filter_args(context, type, &session, (void **)&data, &sz);
 
 		if (source == 0) {
-			source = context->handle;
+			source = context->m_handle;
 		}
 
 		if (destination == 0) {
 			return session;
 		}
-		if (skynet_harbor_message_isremote(destination)) {
-			struct remote_message * rmsg = malloc(sizeof(*rmsg));
+		if (Harbor::instance()->isremote(destination)) {
+			struct remote_message * rmsg = (struct remote_message*)malloc(sizeof(*rmsg));
 			rmsg->destination.handle = destination;
 			rmsg->message = data;
 			rmsg->sz = sz;
-			skynet_harbor_send(rmsg, source, session);
+			Harbor::instance()->send(rmsg, source, session);
 		} else {
-			struct skynet_message smsg;
+			struct Message smsg;
 			smsg.source = source;
 			smsg.session = session;
 			smsg.data = data;
@@ -77,7 +81,7 @@ namespace fibernet
 
 			if (Context::push(destination, &smsg)) {
 				free(data);
-				skynet_error(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type, (int)(sz & HANDLE_MASK));
+				errorlog(NULL, "Drop message from %x to %x (type=%d)(size=%d)", source, destination, type, (int)(sz & HANDLE_MASK));
 				return -1;
 			}
 		}
@@ -85,29 +89,29 @@ namespace fibernet
 	}
 
 	//------------------------------------------------------------------------
-	static int Dispatcher::send(Context * context, const char * addr , int type, int session, void * data, size_t sz) 
+	int Dispatcher::send(Context * context, const char * addr , int type, int session, void * data, size_t sz) 
 	{
-		uint32_t source = context->handle;
+		uint32_t source = context->m_handle;
 		uint32_t des = 0;
 		if (addr[0] == ':') {
 			des = strtoul(addr+1, NULL, 16);
 		} else if (addr[0] == '.') {
-			des = (*Handle::instance())[addr+1];
+			des = Handle::instance()->get_handle(addr+1);
 			if (des == 0) {
 				free(data);
-				skynet_error(context, "Drop message to %s", addr);
+				errorlog(context, "Drop message to %s", addr);
 				return session;
 			}
 		} else {
 			_filter_args(context, type, &session, (void **)&data, &sz);
 
-			struct remote_message * rmsg = malloc(sizeof(*rmsg));
+			struct remote_message * rmsg = (struct remote_message *)malloc(sizeof(*rmsg));
 			_copy_name(rmsg->destination.name, addr);
 			rmsg->destination.handle = 0;
 			rmsg->message = data;
 			rmsg->sz = sz;
 
-			skynet_harbor_send(rmsg, source, session);
+			Harbor::instance()->send(rmsg, source, session);
 			return session;
 		}
 
@@ -115,7 +119,7 @@ namespace fibernet
 	}
 	
 	//------------------------------------------------------------------------
-	static void Dispatcher::_filter_args(Context * context, int type, int *session, void ** data, size_t * sz) 
+	void Dispatcher::_filter_args(Context * context, int type, int *session, void ** data, size_t * sz) 
 	{
 		int dontcopy = type & PTYPE_TAG_DONTCOPY;
 		int allocsession = type & PTYPE_TAG_ALLOCSESSION;
@@ -128,9 +132,9 @@ namespace fibernet
 
 		char * msg;
 		if (dontcopy || *data == NULL) {
-			msg = *data;
+			msg = (char*)*data;
 		} else {
-			msg = malloc(*sz+1);
+			msg = (char*)malloc(*sz+1);
 			memcpy(msg, *data, *sz);
 			msg[*sz] = '\0';
 		}
@@ -141,16 +145,16 @@ namespace fibernet
 	}
 
 	//------------------------------------------------------------------------
-	static void Dispatcher::_dispatch_message(Context *ctx, Message *msg) 
+	void Dispatcher::_dispatch_message(Context *ctx, Message *msg) 
 	{
-		assert(ctx->init);
+		assert(ctx->m_init);
 		CHECKCALLING_BEGIN(ctx)
 		int type = msg->sz >> HANDLE_REMOTE_SHIFT;
 		size_t sz = msg->sz & HANDLE_MASK;
 		if (type == PTYPE_MULTICAST) {
-			skynet_multicast_dispatch((struct skynet_multicast_message *)msg->data, ctx, 
+			((MulticastMessage*)msg->data)->dispatch(ctx,_mc);
 		} else {
-			int reserve = ctx->cb(ctx, ctx->cb_ud, type, msg->session, msg->source, msg->data, sz);
+			int reserve = ctx->m_cb(ctx, ctx->m_ud, type, msg->session, msg->source, msg->data, sz);
 			reserve |= _forwarding(ctx, msg);
 			if (!reserve) {
 				free(msg->data);
@@ -160,11 +164,11 @@ namespace fibernet
 	}
 
 	//------------------------------------------------------------------------
-	static int Dispatcher::_forwarding(Context *ctx, Message *msg) 
+	int Dispatcher::_forwarding(Context *ctx, Message *msg) 
 	{
-		if (ctx->forward) {
-			uint32_t des = ctx->forward;
-			ctx->forward = 0;
+		if (ctx->m_forward) {
+			uint32_t des = ctx->m_forward;
+			ctx->m_forward = 0;
 			_send_message(des, msg);
 			return 1;
 		}
@@ -172,33 +176,33 @@ namespace fibernet
 	}
 	
 	//------------------------------------------------------------------------
-	static void Dispatcher::_send_message(uint32_t des, Message *msg) 
+	void Dispatcher::_send_message(uint32_t des, Message *msg) 
 	{
-		if (skynet_harbor_message_isremote(des)) {
-				struct remote_message * rmsg = malloc(sizeof(*rmsg));
+		if (Harbor::instance()->isremote(des)) {
+				struct remote_message * rmsg = (struct remote_message *)malloc(sizeof(*rmsg));
 				rmsg->destination.handle = des;
 				rmsg->message = msg->data;
 				rmsg->sz = msg->sz;
-				skynet_harbor_send(rmsg, msg->source, msg->session);
+				Harbor::instance()->send(rmsg, msg->source, msg->session);
 		} else {
 			if (Context::push(des, msg)) {
 				free(msg->data);
-				skynet_error(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
+				errorlog(NULL, "Drop message from %x forward to %x (size=%d)", msg->source, des, (int)msg->sz);
 			}
 		}
 	}
 
 	//------------------------------------------------------------------------
-	static void Dispatcher::_mc(void *ud, uint32_t source, const void * msg, size_t sz) 
+	void Dispatcher::_mc(void *ud, uint32_t source, const void * msg, size_t sz) 
 	{
-		Context * ctx = ud;
+		Context * ctx = (Context *) ud;
 		int type = sz >> HANDLE_REMOTE_SHIFT;
 		sz &= HANDLE_MASK;
-		ctx->cb(ctx, ctx->cb_ud, type, 0, source, msg, sz);
-		if (ctx->forward) {
-			uint32_t des = ctx->forward;
-			ctx->forward = 0;
-			struct skynet_message message;
+		ctx->m_cb(ctx, ctx->m_ud, type, 0, source, msg, sz);
+		if (ctx->m_forward) {
+			uint32_t des = ctx->m_forward;
+			ctx->m_forward = 0;
+			Message message;
 			message.source = source;
 			message.session = 0;
 			message.data = malloc(sz);

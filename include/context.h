@@ -6,10 +6,6 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#include "module.h"
-#include "mq.h"
-#include "handle.h"
-
 #ifdef CALLING_CHECK
 
 #define CHECKCALLING_BEGIN(ctx) assert(__sync_lock_test_and_set(&ctx->calling,1) == 0);
@@ -28,6 +24,13 @@
 
 namespace fibernet 
 {
+	class Context;
+	typedef int (*fibernet_cb)(Context * context, void *ud, int type, int session, uint32_t source , const void * msg, size_t sz);
+
+	//------------------------------------------------------------------------
+	class Module;
+	class MQ;
+	class Message;
 	class Context
 	{
 	private:
@@ -75,7 +78,7 @@ namespace fibernet
 		void grab() { __sync_add_and_fetch(&m_ref,1); }
 
 		void send(void * msg, size_t sz, uint32_t source, int type, int session);
-		static int push(uint32_t handle, MQ::Message *message);
+		static int push(uint32_t handle, Message *message);
 		static void endless(uint32_t handle);
 		Context * release(); 
 	
@@ -103,6 +106,7 @@ namespace fibernet
 	public:
 		static Context * create(const char * name, const char *param);
 	};
+
 }
 
 
