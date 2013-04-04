@@ -40,7 +40,7 @@ namespace fibernet
 		uint32_t m_handle;		// handle
 		int m_sess_id;			// session id
 
-		char m_result[32];		// storing non-integer result
+		char m_result[32];		// COMMAND return value
 		void * m_ud;			// user data
 		fibernet_cb m_cb;		// call back function
 
