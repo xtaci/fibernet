@@ -3,8 +3,10 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
+#include <assert.h>
 
-#define DEFAULT_QUEUE_SIZE 64;
+#define DEFAULT_QUEUE_SIZE 64
 #define MAX_GLOBAL_MQ 0x10000
 
 // 0 means mq is not in global mq.
@@ -16,13 +18,11 @@
 #define MQ_DISPATCHING 2
 #define MQ_LOCKED 3
 
-#define LOCK(q) while (__sync_lock_test_and_set(&(q)->lock,1)) {}
-#define UNLOCK(q) __sync_lock_release(&(q)->lock);
-
 #define GP(p) ((p) % MAX_GLOBAL_MQ)
 
 namespace fibernet 
 {
+	class MQ;
 	/**
 	 * Global Message Queue
 	 */
@@ -32,7 +32,10 @@ namespace fibernet
 		uint32_t tail;
 		MQ ** queue;
 		bool * flag;
-	public:
+
+		static GlobalMQ * global;
+
+	private:
 		GlobalMQ():head(0), tail(0)
 		{
 			queue = new MQ*[MAX_GLOBAL_MQ];
@@ -44,6 +47,21 @@ namespace fibernet
 		{
 			delete [] queue;
 			delete [] flag;
+		}
+	
+	public:
+		static GlobalMQ * instance()
+		{
+			if (!global) {
+				global = new GlobalMQ();
+			}
+
+			return global;
+		}
+
+		static void release()
+		{
+			if (global) { delete global; }
 		}
 
 		MQ * pop(void)
@@ -63,27 +81,22 @@ namespace fibernet
 			if (!__sync_bool_compare_and_swap(&head, head, head+1)) {
 				return NULL;
 			}
-			q->flag[head_ptr] = false;
+
+			flag[head_ptr] = false;
 			__sync_synchronize();
 
 			return mq;
 		}
 
-		void push(MQ * queue)
+		void push(MQ * mq)
 		{
 			uint32_t tail = GP(__sync_fetch_and_add(&tail,1));
-			queue[tail] = queue;
+			queue[tail] = mq;
 			__sync_synchronize();
 			flag[tail] = true;
 			__sync_synchronize();
 		}
-
-		void force_push(MQ * queue)
-		{
-			assert(queue->in_global);
-			push(queue);
-		}
-	}
+	};
 
 	/**
 	 * Message Queue
@@ -91,6 +104,7 @@ namespace fibernet
 	class MQ 
 	{
 	public:
+
 		struct Message 
 		{
 			uint32_t source;
@@ -100,80 +114,158 @@ namespace fibernet
 		};
 
 	private:
-		uint32_t handle;
+
+		uint32_t m_handle;
 		int cap;
 		int head;
 		int tail;
-		int lock;
-		int release;
+		int m_lock;
+		int m_release;
 		int lock_session;
 		int in_global;
 		Message *queue;
+
 	public:
 
-		MQ(uint32_t _handle):handle(_handle),
+		MQ(uint32_t handle) : m_handle(handle),
 			cap(DEFAULT_QUEUE_SIZE),
 			head(0),
 			tail(0),
-			lock(0),
+			m_lock(0),
 			in_global(MQ_IN_GLOBAL),
-			release(0),
+			m_release(0),
 			lock_session(0)
 		{
 			queue = new Message[cap];
 		}
 
-		~MQ()
-		{
-			delete [] queue;
-		}
-		
-		void mark_release()
-		{
-		}
-		
-		int release()
-		{
-		}
-		
-		inline uint32_t handle() { return handle;}
+	
+		inline uint32_t handle() { return m_handle;}
 
+		/**
+		 * enter global queue
+		 */
+		void pushglobal() {
+			LOCK();
+			assert(in_global);
+			if (in_global == MQ_DISPATCHING) {
+				// lock message queue just now.
+				in_global = MQ_LOCKED;
+			}
+			if (lock_session == 0) {
+				GlobalMQ::instance()->push(this);
+				in_global = MQ_IN_GLOBAL;
+			}
+			UNLOCK();
+		}
+
+		/**
+		 * pop out a message 
+		 */
 		int pop(Message * message)
 		{
 			int ret = 1;
-			lock()
+			LOCK();
 
-			if (q->head != q->tail) {
-				*message = q->queue[q->head];
+			if (head != tail) {
+				*message = queue[head];
 				ret = 0;
-				if ( ++ q->head >= q->cap) {
-					q->head = 0;
+				if ( ++head >= cap) {
+					head = 0;
 				}
 			}
 
 			if (ret) {
-				q->in_global = 0;
+				in_global = 0;
 			}
 			
-			unlock()
+			UNLOCK();
 
 			return ret;
 		}
 
+		/**
+		 * push a message
+		 */
 		void push(Message * message)
 		{
+			assert(message);
+			LOCK();
+	
+			// detect whether the msg sender is the locker
+			// if it's the locker's msg, put it in front of the queue.
+			if (lock_session !=0 && message->session == lock_session) {
+				pushhead(message);
+			} else {
+				queue[tail] = *message;
+				if (++tail >= cap) {
+					tail = 0;
+				}
+
+				if (head == tail) {
+					expand();
+				}
+
+				// if mq is locked, just queue the msg and leave.
+				if (lock_session == 0) {
+					if (in_global == 0) {
+						in_global = MQ_IN_GLOBAL;
+						GlobalMQ::instance()->push(this);
+					}
+				}
+			}
+			
+			UNLOCK();
 		}	
 
+		/**
+		 * lock the queue by session
+		 */
 		void lock(int session)
 		{
+			LOCK();
+			assert(lock_session == 0);
+			assert(in_global == MQ_IN_GLOBAL);
+			in_global = MQ_DISPATCHING;
+			lock_session = session;
+			UNLOCK();
 		}
 
-		void force_push()
+		/**
+		 * release procedure, mark->(dispatcher release)
+		 * mark first, later schedule.
+		 */
+		void mark_release()
 		{
-		}	
+			assert(m_release == 0);
+			m_release = 1;
+		}
+		
+		int release() 
+		{
+			int ret = 0;
+			LOCK();
+			
+			if (m_release) {
+				UNLOCK();
+				ret = drop_queue();
+			} else {
+				GlobalMQ::instance()->push(this);
+				UNLOCK();
+			}
+		
+			return ret;
+		}
+
 	private:
-		void lock() { while (__sync_lock_test_and_set(&lock,1)) {} }
-		void unlock() { __sync_lock_release(&lock); }
+
+		~MQ()
+		{
+			delete [] queue;
+		}
+
+		inline void LOCK() { while (__sync_lock_test_and_set(&m_lock,1)) {} }
+		inline void UNLOCK() { __sync_lock_release(&m_lock); }
 
 		/** 
 		 * queue expanding
@@ -186,13 +278,63 @@ namespace fibernet
 				new_queue[i] = queue[(head + i) % cap];
 			}
 			head = 0;
-			tail = q->cap;
+			tail = cap;
 			cap *= 2;
 			
 			delete [] queue;	
 			queue = new_queue;
 		}
-	}
+
+		/**
+	     * push the msg to the head of the queue.
+		 */
+		void pushhead(Message *message) {
+			int head = head - 1;
+			if (head < 0) {
+				head = cap - 1;
+			}
+			if (head == tail) {
+				expand();
+				--tail;
+				head = cap - 1;
+			}
+
+			queue[head] = *message;
+			head = head;
+
+			// this api use in push a unlock message, so the in_global flags must not be 0 , 
+			// but the q is not exist in global queue.
+			if (in_global == MQ_LOCKED) {
+				GlobalMQ::instance()->push(this);
+				in_global = MQ_IN_GLOBAL;
+			} else {
+				assert(in_global == MQ_DISPATCHING);
+			}
+			lock_session = 0;
+		}
+
+		/**
+		 * queue drop 
+		 */
+		int drop_queue() {
+			// todo: send message back to message source
+			struct Message msg;
+			int s = 0;
+			while(!pop(&msg)) {
+				++s;
+				int type = msg.sz >> HANDLE_REMOTE_SHIFT;
+				if (type == PTYPE_MULTICAST) {
+					assert((msg.sz & HANDLE_MASK) == 0);
+					skynet_multicast_dispatch((struct skynet_multicast_message *)msg.data, NULL, NULL);
+				} else {
+					// make sure data is freed
+					free(msg.data);
+				}
+			}
+			delete this;
+			return s;
+		}
+	};
 }
 
 #endif
