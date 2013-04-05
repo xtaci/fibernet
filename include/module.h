@@ -103,7 +103,7 @@ namespace fibernet {
 		/**
 		 * module create/init/release
 		 */
-		void * mod_create(Module *m) 
+		void * call_create(Module *m) 
 		{
 			if (m->create) {
 				return m->create();
@@ -112,12 +112,12 @@ namespace fibernet {
 			}
 		}
 
-		int mod_init(Module *m, void * inst, struct skynet_context *ctx, const char * parm) 
+		int call_init(Module *m, void * inst, struct skynet_context *ctx, const char * parm) 
 		{
 			return m->init(inst, ctx, parm);
 		}
 
-		void mod_release(Module *m, void *inst) 
+		void call_release(Module *m, void *inst) 
 		{
 			if (m->release) {
 				m->release(inst);

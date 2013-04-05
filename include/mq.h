@@ -35,7 +35,7 @@ namespace fibernet
 		MQ ** queue;
 		bool * flag;
 
-		static GlobalMQ * m_instance;
+		static GlobalMQ * _instance;
 
 	private:
 		GlobalMQ():head(0), tail(0)
@@ -54,16 +54,16 @@ namespace fibernet
 	public:
 		static GlobalMQ * instance()
 		{
-			if (!m_instance) {
-				m_instance = new GlobalMQ();
+			if (!_instance) {
+				_instance = new GlobalMQ();
 			}
 
-			return m_instance;
+			return _instance;
 		}
 
 		static void release()
 		{
-			if (m_instance) { delete m_instance; }
+			if (_instance) { delete _instance; }
 		}
 
 		MQ * pop(void)
