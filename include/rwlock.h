@@ -36,8 +36,8 @@ namespace fibernet
 		 */
 		inline void wlock() 
 		{
-			while (__sync_lock_test_and_set(&lock->write,1)) {}
-			while(lock->read) {
+			while (__sync_lock_test_and_set(&write,1)) {}
+			while(read) {
 				__sync_synchronize();
 			}
 		}
@@ -45,17 +45,17 @@ namespace fibernet
 		/**
 		 * write unlock 
 		 */
-		inline void wunlock(struct rwlock *lock) 
+		inline void wunlock() 
 		{
-			__sync_lock_release(&lock->write);
+			__sync_lock_release(&write);
 		}
 
 		/**
 		 * read unlock
 		 */
-		inline void runlock(struct rwlock *lock) 
+		inline void runlock() 
 		{
-			__sync_sub_and_fetch(&lock->read,1);
+			__sync_sub_and_fetch(&read,1);
 		}
 	};
 }

@@ -1,10 +1,12 @@
-#ifndef SKYNET_MESSAGE_QUEUE_H
-#define SKYNET_MESSAGE_QUEUE_H
+#ifndef FIBERNET_MESSAGE_QUEUE_H
+#define FIBERNET_MESSAGE_QUEUE_H
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <assert.h>
+
+#include "fibernet.h"
 
 #define DEFAULT_QUEUE_SIZE 64
 #define MAX_GLOBAL_MQ 0x10000
@@ -33,7 +35,7 @@ namespace fibernet
 		MQ ** queue;
 		bool * flag;
 
-		static GlobalMQ * global;
+		static GlobalMQ * m_instance;
 
 	private:
 		GlobalMQ():head(0), tail(0)
@@ -52,16 +54,16 @@ namespace fibernet
 	public:
 		static GlobalMQ * instance()
 		{
-			if (!global) {
-				global = new GlobalMQ();
+			if (!m_instance) {
+				m_instance = new GlobalMQ();
 			}
 
-			return global;
+			return m_instance;
 		}
 
 		static void release()
 		{
-			if (global) { delete global; }
+			if (m_instance) { delete m_instance; }
 		}
 
 		MQ * pop(void)
