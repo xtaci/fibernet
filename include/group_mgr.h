@@ -96,7 +96,7 @@ namespace fibernet
 				Context * ctx = m_hash[group_handle];
 				char * cmd = malloc(8);
 				int n = sprintf(cmd, "C");
-				skynet_context_send(ctx, cmd, n+1, 0 , PTYPE_SYSTEM, 0);
+				Dispatcher::send(ctx, cmd, n+1, 0 , PTYPE_SYSTEM, 0);
 				m_hash.delete_key(group_handle);
 			}
 
@@ -121,10 +121,10 @@ namespace fibernet
 			return ctx;
 		}
 
-		void send_command(struct skynet_context *ctx, const char * cmd, uint32_t node) {
+		void send_command(Context *ctx, const char * cmd, uint32_t node) {
 			char * tmp = malloc(16);
 			int n = sprintf(tmp, "%s %x", cmd, node);
-			skynet_context_send(ctx, tmp, n+1 , 0, PTYPE_SYSTEM, 0);
+			Dispatcher::send(ctx, tmp, n+1 , 0, PTYPE_SYSTEM, 0);
 		}
 	}
 }

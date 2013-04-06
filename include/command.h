@@ -108,7 +108,7 @@ namespace fibernet
 			 * destroy context
 			 */
 			if (strcmp(cmd,"EXIT") == 0) {
-				skynet_handle_retire(ctx->handle);
+				Handle::instance()->retire(ctx->handle);
 				return NULL;
 			}
 
@@ -126,7 +126,7 @@ namespace fibernet
 					// todo : kill global service
 				}
 				if (handle) {
-					skynet_handle_retire(handle);
+					Handle::instance()->retire(handle);
 				}
 				return NULL;
 			}
@@ -142,12 +142,12 @@ namespace fibernet
 				char * args = tmp;
 				char * mod = strsep(&args, " \t\r\n");
 				args = strsep(&args, "\r\n");
-				struct skynet_context * inst = skynet_context_new(mod,args);
+				Context * new_ctx = ContextFactory::create(mod,args);
 				if (inst == NULL) {
 					fprintf(stderr, "Launch %s %s failed\n",mod,args);
 					return NULL;
 				} else {
-					_id_to_hex(ctx->result, inst->handle);
+					_id_to_hex(ctx->result, new_ctx->handle);
 					return ctx->result;
 				}
 			}
@@ -223,7 +223,7 @@ namespace fibernet
 			 * destroy all context
 			 */
 			if (strcmp(cmd,"ABORT") == 0) {
-				skynet_handle_retireall();
+				Handle::instance()->retireall();
 				return NULL;
 			}
 
@@ -233,7 +233,7 @@ namespace fibernet
 		/**
 		 * group command, start with GROUP command params
 		 */
-		static const char * _group_command(struct skynet_context * ctx, const char * cmd, int group_handle, uint32_t addr) 
+		static const char * _group_command(Context * ctx, const char * cmd, int group_handle, uint32_t addr) 
 		{
 			uint32_t self;
 			if (addr != 0) {

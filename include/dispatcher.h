@@ -173,7 +173,7 @@ namespace fibernet
 
 			if (allocsession) {
 				assert(*session == 0);
-				*session = skynet_context_newsession(context);
+				*session = context->newsession();
 			}
 
 			char * msg;
@@ -226,7 +226,7 @@ namespace fibernet
 
 		static void _mc(void *ud, uint32_t source, const void * msg, size_t sz) 
 		{
-			struct skynet_context * ctx = ud;
+			Context * ctx = ud;
 			int type = sz >> HANDLE_REMOTE_SHIFT;
 			sz &= HANDLE_MASK;
 			ctx->cb(ctx, ctx->cb_ud, type, 0, source, msg, sz);

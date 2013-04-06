@@ -13,7 +13,7 @@
 namespace fibernet {
 
 	typedef void * (*fibernet_dl_create)(void);
-	typedef int (*fibernet_dl_init)(void * inst, struct skynet_context *, const char * parm);
+	typedef int (*fibernet_dl_init)(void * inst, Context *, const char * parm);
 	typedef void (*fibernet_dl_release)(void * inst);
 
 	/**
@@ -38,7 +38,7 @@ namespace fibernet {
 			}
 		}
 
-		int call_init(void * inst, struct skynet_context *ctx, const char * parm) 
+		int call_init(void * inst, Context *ctx, const char * parm) 
 		{
 			return init(inst, ctx, parm);
 		}

@@ -44,7 +44,7 @@ namespace fibernet
 
 	public:
 		
-		static Handle * create_instance(int harbor)
+		static void create_instance(int harbor)
 		{
 			if (!m_instance) {
 				m_instance = new Handle(harbor);
@@ -140,7 +140,7 @@ namespace fibernet
 		}
 
 		/**
-	     * grab the context of the handle
+		 * grab the context of the handle
 		 */	
 		Context * grab(uint32_t handle)
 		{
@@ -175,10 +175,6 @@ namespace fibernet
 		}
 
 	private:
-	
-		/**
-		 * get the name from the handle
-		 */	
 		std::string operator[] (uint32_t handle)
 		{
 			Context * ctx;
