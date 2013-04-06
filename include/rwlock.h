@@ -1,5 +1,5 @@
-#ifndef _RWLOCK_H_
-#define _RWLOCK_H_
+#ifndef __RWLOCK_H__
+#define __RWLOCK_H__
 
 namespace fibernet 
 {

@@ -1,3 +1,5 @@
+#ifndef __FIBERNET_CONTEXT_H__
+#define __FIBERNET_CONTEXT_H__
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
@@ -145,3 +147,6 @@ namespace fibernet
 		
 	};
 }
+
+
+#endif //

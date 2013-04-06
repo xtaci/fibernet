@@ -1,5 +1,5 @@
-#ifndef FIBERNET_MESSAGE_QUEUE_H
-#define FIBERNET_MESSAGE_QUEUE_H
+#ifndef __FIBERNET_MQ_H__
+#define __FIBERNET_MQ_H__
 
 #include <stdlib.h>
 #include <stdint.h>

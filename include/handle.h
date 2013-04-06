@@ -1,5 +1,5 @@
-#ifndef FIBERNET_HANDLE_H
-#define FIBERNET_HANDLE_H
+#ifndef __FIBERNET_HANDLE_H__
+#define __FIBERNET_HANDLE_H__
 
 #include <stdlib.h>
 #include <assert.h>
