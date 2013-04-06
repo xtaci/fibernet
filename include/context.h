@@ -30,16 +30,16 @@ namespace fibernet
 	class Context
 	{
 	private:
-		void * instance;
-		MOdule * mod;
-		uint32_t handle;
-		int ref;
-		char result[32];
-		void * cb_ud;
+		void * instance;		// result of xxx_create
+		MOdule * mod;			// the module
+		uint32_t handle;		// handle
+		int ref;				// ref count
+		char result[32];		// non integer result
+		void * cb_ud;			// 
 		skynet_cb cb;
 		int session_id;
-		uint32_t forward;
-		struct message_queue *queue;
+		uint32_t forward;				// forward to another ctx
+		struct message_queue *queue;	// mq
 		bool init;
 		bool endless;
 
@@ -47,11 +47,13 @@ namespace fibernet
 
 		CHECKCALLING_DECL
 
-	private:
-		Context(const Context&);
-		Context& operator= (const Context&);
+		friend class ContextFactory;	
+		friend class Dispatcher;
+		friend class Command;
 
 	public:
+		void init(uint32_t _handle) { this.handle = _handle; }
+
 		int newsession()
 		{
 			int session = ++session_id;
@@ -73,6 +75,10 @@ namespace fibernet
 		}
 
 	private:
+		Context();
+		Context(const Context&);
+		Context& operator= (const Context&);
+
 		void _delete_context() 
 		{
 			mod->call_release();
@@ -82,13 +88,49 @@ namespace fibernet
 			context_dec();
 		}
 
+	public:
+		/**
+		 * push a message to a context by handle.
+		 */
+		static int push(uint32_t handle, Message *message) 
+		{
+			Context * ctx = Handle::instance()->grab(handle);
+			if (ctx == NULL) {
+				return -1;
+			}
+			ctx->queue->push(message);
+			ctx->release();
+
+			return 0;
+		}
+
+		/**
+ 		 * set the endless flag for a context by handle.
+		 */
+		static void endless(uint32_t handle) 
+		{
+			Context * ctx = Handle::instance()->grab(handle);
+			if (ctx == NULL) {
+				return;
+			}
+			ctx->endless = true;
+			ctx->release();
+		}
+
+		/**
+		 * forward the message of to another context.
+		 */
+		static void forward(uint32_t destination) 
+		{
+			assert(context->forward == 0);
+			context->forward = destination;
+		}
 	
 	public:
 		static int context_total() { return g_total_context; }
 		static void context_inc() { __sync_fetch_and_add(&g_total_context,1); }
 		static void context_dec() { __sync_fetch_and_sub(&g_total_context,1); }
 
-		friend class ContextFactory;	
 	};
 
 	class ContextFactory {

@@ -77,35 +77,25 @@ namespace alg
 			insert_case1(inserted_node);
 		}
 
-        /**
-         * contain test
-         */
+		/**
+		 * contain test
+		 */
         bool contains(KeyT key)
         {
             if (lookup_node(key))
                 return true;
             return false;
         }
-
-        /**
-         * rbtree_lookup
-         * search in red-black tree
-         */
-        ValueT operator [] (KeyT key)
-        {
-            KVNode * n = lookup_node(key);
-            if (n==NULL) throw std::out_of_range ("no such key");
-            return n->value;
-        }
-
+	
 		/**
 		 * rbtree_lookup
 		 * search in red-black tree
 		 */
-		ValueT lookup(KeyT key) 
+		ValueT operator [] (KeyT key) 
 		{
 			KVNode * n = lookup_node(key);
-			return n == NULL ? NULL : n->value;
+			if (n==NULL) throw std::out_of_range ("no such key");
+			return n->value;
 		}
 
 		/**
@@ -136,7 +126,31 @@ namespace alg
 			delete(n);
 		}
 
+		void print() {
+			print_helper(KVNODE(get_root()), 0);
+			puts("");
+		}
 	protected:
+		void print_helper(KVNode * n, int indent) {
+			int i;
+			if (n == NULL) {
+				fputs("<empty tree>", stdout);
+				return;
+			}
+			if (n->right != NULL) {
+				print_helper(KVNODE(n->right), indent + INDENT_STEP);
+			}
+			for(i=0; i<indent; i++)
+				fputs(" ", stdout);
+			if (n->color == BLACK)
+				printf("%d\n", (int)n->key);
+			else
+				printf("<%d>\n", (int)n->key);
+			if (n->left != NULL) {
+				print_helper(KVNODE(n->left), indent + INDENT_STEP);
+			}
+		}
+
 		KVNode * new_node(KeyT key, ValueT value, color rbtree_node_color, rbtree_node left, rbtree_node right) {
 			KVNode * result =new KVNode;
 			result->key = key;

@@ -162,16 +162,16 @@ namespace fibernet
 		}
 
 		/**
-		 * pop out a message 
+		 * pop out a message
 		 */
-		int pop(Message * message)
+		bool pop(Message * message)
 		{
-			int ret = 1;
+			bool ret = false;
 			LOCK();
 
 			if (head != tail) {
 				*message = queue[head];
-				ret = 0;
+				ret = true;
 				if ( ++head >= cap) {
 					head = 0;
 				}
@@ -189,7 +189,7 @@ namespace fibernet
 		/**
 		 * push a message
 		 */
-		void push(Message * message)
+		void push(const Message * message)
 		{
 			assert(message);
 			LOCK();
@@ -199,6 +199,7 @@ namespace fibernet
 			if (lock_session !=0 && message->session == lock_session) {
 				pushhead(message);
 			} else {
+				// queue the msg
 				queue[tail] = *message;
 				if (++tail >= cap) {
 					tail = 0;
@@ -208,7 +209,7 @@ namespace fibernet
 					expand();
 				}
 
-				// if mq is locked, just queue the msg and leave.
+				// if mq is locked, just leave
 				if (lock_session == 0) {
 					if (in_global == 0) {
 						in_global = MQ_IN_GLOBAL;
