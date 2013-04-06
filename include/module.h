@@ -25,6 +25,30 @@ namespace fibernet {
 		fibernet_dl_create create;	// point to create function 
 		fibernet_dl_init init;		// point to init function
 		fibernet_dl_release release;	// pointer to release function
+
+		/**
+		 * module create/init/release
+		 */
+		void * call_create() 
+		{
+			if (create) {
+				return create();
+			} else {
+				return (void *)(intptr_t)(~0);
+			}
+		}
+
+		int call_init(void * inst, struct skynet_context *ctx, const char * parm) 
+		{
+			return init(inst, ctx, parm);
+		}
+
+		void call_release(void *inst) 
+		{
+			if (release) {
+				release(inst);
+			}
+		}
 	};
 
 	/**
@@ -40,20 +64,12 @@ namespace fibernet {
 		static GlobalModules * _instance;
 	public:
 
-		static GlobalModules * instance()
+		static void create_instance(const char * path)
 		{
-			if (!_instance) {
-				_instance = new GlobalModules();
-			}
+			if (!_instance) _instance = new GlobalModules(path);
 		}
 
-		/**
-		 * set path once
-		 */
-		void set_path_once(const char * path)
-		{
-			if (!m_path) m_path = strdup(path);
-		}
+		static GlobalModules * instance() { return _instance;}
 
 		/**
 		 * query a module 
@@ -100,33 +116,12 @@ namespace fibernet {
 			__sync_lock_release(&m_lock);
 		}
 
-		/**
-		 * module create/init/release
-		 */
-		void * call_create(Module *m) 
-		{
-			if (m->create) {
-				return m->create();
-			} else {
-				return (void *)(intptr_t)(~0);
-			}
-		}
-
-		int call_init(Module *m, void * inst, struct skynet_context *ctx, const char * parm) 
-		{
-			return m->init(inst, ctx, parm);
-		}
-
-		void call_release(Module *m, void *inst) 
-		{
-			if (m->release) {
-				m->release(inst);
-			}
-		}
-
 	private:
-		GlobalModules():m_count(0),m_lock(0),m_path(0) { }
+		GlobalModules(const char * path):m_count(0),m_lock(0) { m_path = strdup(path); }
 
+		/**
+		 * try opening a .so 
+		 */
 		void * try_open(const char * name) 
 		{
 			const char * path = m_path;
@@ -158,6 +153,9 @@ namespace fibernet {
 			return dl;
 		}
 
+		/**
+		 * find a module by name
+		 */
 		Module * find(const char * name) 
 		{
 			int i;
@@ -169,6 +167,9 @@ namespace fibernet {
 			return NULL;
 		}
 
+		/**
+		 * load module symbol
+		 */
 		int open_sym(Module *mod) 
 		{
 			size_t name_size = strlen(mod->name);
