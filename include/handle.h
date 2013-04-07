@@ -160,7 +160,7 @@ namespace fibernet
 		/**
 		 * get the handle from a name
 		 */
-		uint32_t operator [] (const char * name)
+		uint32_t get_handle(const char * name)
 		{
 			std::string tmp = name;
 			uint32_t handle = 0;
