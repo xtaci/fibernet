@@ -7,6 +7,7 @@
 #include <assert.h>
 
 #include "fibernet.h"
+#include "harbor.h"
 
 #define DEFAULT_QUEUE_SIZE 64
 #define MAX_GLOBAL_MQ 0x10000
@@ -291,7 +292,7 @@ namespace fibernet
 		/**
 	     * push the msg to the head of the queue.
 		 */
-		void pushhead(Message *message) {
+		void pushhead(const Message *message) {
 			int head = head - 1;
 			if (head < 0) {
 				head = cap - 1;

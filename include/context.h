@@ -8,6 +8,7 @@
 
 #include "module.h"
 #include "mq.h"
+#include "handle.h"
 
 #ifdef CALLING_CHECK
 
@@ -30,20 +31,24 @@ namespace fibernet
 	class Context
 	{
 	private:
-		void * instance;		// result of xxx_create
-		MOdule * mod;			// the module
-		uint32_t handle;		// handle
-		int ref;				// ref count
-		char result[32];		// non integer result
-		void * cb_ud;			// 
-		skynet_cb cb;
-		int session_id;
-		uint32_t forward;		// forward to another ctx
-		MQ *queue;				// mq
-		bool init;
-		bool endless;
+		Module * m_mod;			// the module
+		void * m_instance;		// result of xxx_create
 
-		static int g_total_context = 0;
+		uint32_t m_handle;		// handle
+		int m_sess_id;
+
+		char m_result[32];		// storing non-integer result
+		void * m_ud;			// user data
+		fibernet_cb m_cb;		// call back function
+
+		MQ * queue;				// mq
+
+		uint32_t m_forward;		// forward to another ctx
+		bool m_init;
+		bool m_endless;
+		int m_ref;				// ref count
+
+		static int g_total_context;
 
 		CHECKCALLING_DECL
 
@@ -52,155 +57,51 @@ namespace fibernet
 		friend class Command;
 
 	public:
-		void init(uint32_t _handle) { this.handle = _handle; }
+		void init(uint32_t handle) { m_handle = handle; }
+		uint32_t handle() { return m_handle; }
+
+		void callback(void *ud, fibernet_cb cb) 
+		{
+			m_cb = cb;
+			m_ud = ud;
+		}
 
 		int newsession()
 		{
-			int session = ++session_id;
+			int session = ++m_sess_id;
 			return session;
 		}
 
-		void grab() 
-		{
-			__sync_add_and_fetch(&ctx->ref,1);
-		}
+		void grab() { __sync_add_and_fetch(&m_ref,1); }
 
-		Context * release() 
+		void send(void * msg, size_t sz, uint32_t source, int type, int session);
+		static int push(uint32_t handle, MQ::Message *message);
+		static void endless(uint32_t handle);
+		Context * release(); 
+	
+		/**
+		 * forward the message of to another context.
+		 */
+		void forward(uint32_t destination) 
 		{
-			if (__sync_sub_and_fetch(&ctx->ref,1) == 0) {
-				_delete_context(ctx);
-				return NULL;
-			}
-			return ctx;
+			assert(m_forward == 0);
+			m_forward = destination;
 		}
+	
+		static int context_total() { return g_total_context; }
+		static void context_inc() { __sync_fetch_and_add(&g_total_context,1); }
+		static void context_dec() { __sync_fetch_and_sub(&g_total_context,1); }
 
 	private:
 		Context();
 		Context(const Context&);
 		Context& operator= (const Context&);
-
-		void _delete_context() 
-		{
-			mod->call_release();
-			queue->mark_release();	
-		
-			delete context;	
-			context_dec();
-		}
-
-	public:
-		/**
-		 * send message directly to the this context.
-		 */
-		void send(void * msg, size_t sz, uint32_t source, int type, int session) 
-		{
-			Messsage smsg;
-			smsg.source = source;
-			smsg.session = session;
-			smsg.data = msg;
-			smsg.sz = sz | type << HANDLE_REMOTE_SHIFT;
-			
-			queue->push(&smsg);
-		}
-
-		/**
-		 * push a message to a context by handle.
-		 */
-		static int push(uint32_t handle, Message *message) 
-		{
-			Context * ctx = Handle::instance()->grab(handle);
-			if (ctx == NULL) {
-				return -1;
-			}
-			ctx->queue->push(message);
-			ctx->release();
-
-			return 0;
-		}
-
-		/**
- 		 * set the endless flag for a context by handle.
-		 */
-		static void endless(uint32_t handle) 
-		{
-			Context * ctx = Handle::instance()->grab(handle);
-			if (ctx == NULL) {
-				return;
-			}
-			ctx->endless = true;
-			ctx->release();
-		}
-
-		/**
-		 * forward the message of to another context.
-		 */
-		static void forward(uint32_t destination) 
-		{
-			assert(context->forward == 0);
-			context->forward = destination;
-		}
-	
-	public:
-		static int context_total() { return g_total_context; }
-		static void context_inc() { __sync_fetch_and_add(&g_total_context,1); }
-		static void context_dec() { __sync_fetch_and_sub(&g_total_context,1); }
-
+		void _delete_context();
 	};
 
 	class ContextFactory {
 	public:
-		static Context * create(const char * name, const char *param) 
-		{
-			Module * mod = GlobalModule::instance()->query(name);
-
-			if (mod == NULL)
-				return NULL;
-
-			void *inst = mod->call_create();
-
-			if (inst == NULL)
-				return NULL;
-
-			Context * ctx = new Context;
-			CHECKCALLING_INIT(ctx)
-
-			ctx->mod = mod;
-			ctx->instance = inst;
-			ctx->ref = 2;
-			ctx->cb = NULL;
-			ctx->cb_ud = NULL;
-			ctx->session_id = 0;
-
-			ctx->forward = 0;
-			ctx->init = false;
-			ctx->endless = false;
-			ctx->handle = Handle::instance()->reg(ctx);
-
-			MQ * queue = ctx->queue = new MQ(ctx->handle);
-			// init function maybe use ctx->handle, so it must init at last
-			_context_inc();
-
-			CHECKCALLING_BEGIN(ctx)
-			int r = mod->call_init(inst, ctx, param);
-			CHECKCALLING_END(ctx)
-			if (r == 0) {
-				Context * ret = ctx->release();
-				if (ret) {
-					ctx->init = true;
-				}
-				GlobalMQ::instance()->push(queue);
-				if (ret) {
-					printf("[:%x] launch %s %s\n",ret->handle, name, param ? param : "");
-				}
-				return ret;
-			} else {
-				ctx->release();
-				Handle::instance()->retire(ctx->handle);
-				return NULL;
-			}
-		}
-
-		
+		static Context * create(const char * name, const char *param);
 	};
 }
 

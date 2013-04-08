@@ -8,10 +8,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "context.h"
+
 #define MAX_MODULE_TYPE 32
 
 namespace fibernet {
-
+	
 	typedef void * (*fibernet_dl_create)(void);
 	typedef int (*fibernet_dl_init)(void * inst, Context *, const char * parm);
 	typedef void (*fibernet_dl_release)(void * inst);
